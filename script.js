@@ -48,67 +48,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const deck = document.getElementById('deck');
 
-  // ==========================================
-    // 1. Swipe Controls (Touch Screens) - FIXED
+    // ==========================================
+    // 1. Swipe Controls (Strict Horizontal)
     // ==========================================
     let touchstartX = 0;
+    let touchstartY = 0;
     let touchendX = 0;
-    const swipeThreshold = 50; // Minimum distance for a valid swipe
-    let isValidSwipe = true; // Tracks if the gesture is a single-finger swipe
+    let touchendY = 0;
+    const swipeThreshold = 50; 
+    const maxVerticalDeviation = 30; // Prevents triggering when scrolling vertically
 
     deck.addEventListener('touchstart', (e) => {
-        // If multiple fingers touch the screen (e.g., pinch), cancel the swipe
-        if (e.touches.length > 1) {
-            isValidSwipe = false;
-            return;
-        }
-        isValidSwipe = true; // Reset for a valid single touch
         touchstartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    // Listen for movement in case a second finger lands mid-swipe
-    deck.addEventListener('touchmove', (e) => {
-        if (e.touches.length > 1) {
-            isValidSwipe = false;
-        }
+        touchstartY = e.changedTouches[0].screenY;
     }, { passive: true });
 
     deck.addEventListener('touchend', (e) => {
-        // Abort navigation if the gesture involved multiple fingers
-        if (!isValidSwipe) return;
-
         touchendX = e.changedTouches[0].screenX;
-        const distance = touchendX - touchstartX;
+        touchendY = e.changedTouches[0].screenY;
+        
+        const deltaX = touchendX - touchstartX;
+        const deltaY = touchendY - touchstartY;
 
-        if (distance < -swipeThreshold) {
-            // Swiped left (Next Slide)
-            changeSlide(currentIdx + 1);
-        } else if (distance > swipeThreshold) {
-            // Swiped right (Previous Slide)
-            changeSlide(currentIdx - 1);
+        const isHorizontalLongEnough = Math.abs(deltaX) >= swipeThreshold;
+        const isStrictlyHorizontal = Math.abs(deltaY) <= maxVerticalDeviation;
+
+        if (isHorizontalLongEnough && isStrictlyHorizontal) {
+            if (deltaX < 0) {
+                changeSlide(currentIdx + 1); 
+            } else {
+                changeSlide(currentIdx - 1); 
+            }
         }
     });
 
-// ==========================================
-    // 2. Edge Click Controls (20% Boundary)
+    // ==========================================
+    // 2. Edge Click Controls (10% Boundary)
     // ==========================================
     deck.addEventListener('click', (e) => {
+        // Prevent slide navigation when clicking on images or buttons
+        if (e.target.tagName.toLowerCase() === 'img' || e.target.closest('button') || e.target.closest('a')) {
+            return;
+        }
+
         const rect = deck.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const width = rect.width;
 
-        if (clickX < width * 0.20) {
-            // Left 20% clicked (Previous Slide)
-            changeSlide(currentIdx - 1);
-        } else if (clickX > width * 0.80) {
-            // Right 20% clicked (Next Slide)
-            changeSlide(currentIdx + 1);
+        // Changed from 5% (0.05/0.95) to 10% (0.10/0.90)
+        if (clickX < width * 0.10) {
+            changeSlide(currentIdx - 1); 
+        } else if (clickX > width * 0.90) {
+            changeSlide(currentIdx + 1); 
         }
     });
 
-
-
-    
     // ==========================================
     // 3. Keyboard Controls (Laptops/Clickers)
     // ==========================================
