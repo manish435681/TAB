@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         slides[currentIdx].classList.remove('active');
         currentIdx = index;
+        slides[currentIdx].scrollTop = 0;
         slides[currentIdx].classList.add('active');
         
         updateCounter();
@@ -47,33 +48,45 @@ document.addEventListener('DOMContentLoaded', () => {
     updateCounter();
 
     const deck = document.getElementById('deck');
+    const previousButton = document.getElementById('previous-slide');
+    const nextButton = document.getElementById('next-slide');
+
+    previousButton.addEventListener('click', () => changeSlide(currentIdx - 1));
+    nextButton.addEventListener('click', () => changeSlide(currentIdx + 1));
 
     // ==========================================
     // 1. Swipe Controls (Strict Horizontal)
     // ==========================================
-    let touchstartX = 0;
-    let touchstartY = 0;
-    let touchendX = 0;
-    let touchendY = 0;
+    let pointerStartX = 0;
+    let pointerStartY = 0;
+    let isSwipeCandidate = false;
     const swipeThreshold = 50; 
-    const maxVerticalDeviation = 30; // Prevents triggering when scrolling vertically
+    let suppressDeckClick = false;
+    let suppressClickTimeout;
 
-    deck.addEventListener('touchstart', (e) => {
-        touchstartX = e.changedTouches[0].screenX;
-        touchstartY = e.changedTouches[0].screenY;
+    deck.addEventListener('pointerdown', (e) => {
+        isSwipeCandidate = e.pointerType !== 'mouse' && !e.target.closest('button, a, input, textarea, select');
+        pointerStartX = e.clientX;
+        pointerStartY = e.clientY;
     }, { passive: true });
 
-    deck.addEventListener('touchend', (e) => {
-        touchendX = e.changedTouches[0].screenX;
-        touchendY = e.changedTouches[0].screenY;
-        
-        const deltaX = touchendX - touchstartX;
-        const deltaY = touchendY - touchstartY;
+    deck.addEventListener('pointerup', (e) => {
+        if (!isSwipeCandidate) return;
+        isSwipeCandidate = false;
 
-        const isHorizontalLongEnough = Math.abs(deltaX) >= swipeThreshold;
-        const isStrictlyHorizontal = Math.abs(deltaY) <= maxVerticalDeviation;
+        const deltaX = e.clientX - pointerStartX;
+        const deltaY = e.clientY - pointerStartY;
+        const isHorizontalSwipe =
+            Math.abs(deltaX) >= swipeThreshold &&
+            Math.abs(deltaX) > Math.abs(deltaY) * 1.25;
 
-        if (isHorizontalLongEnough && isStrictlyHorizontal) {
+        if (isHorizontalSwipe) {
+            suppressDeckClick = true;
+            clearTimeout(suppressClickTimeout);
+            suppressClickTimeout = setTimeout(() => {
+                suppressDeckClick = false;
+            }, 700);
+
             if (deltaX < 0) {
                 changeSlide(currentIdx + 1); 
             } else {
@@ -82,10 +95,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    deck.addEventListener('pointercancel', () => {
+        isSwipeCandidate = false;
+    });
+
     // ==========================================
     // 2. Edge Click Controls (10% Boundary)
     // ==========================================
     deck.addEventListener('click', (e) => {
+        if (suppressDeckClick) {
+            suppressDeckClick = false;
+            clearTimeout(suppressClickTimeout);
+            return;
+        }
+
         // Prevent slide navigation when clicking on images or buttons
         if (e.target.tagName.toLowerCase() === 'img' || e.target.closest('button') || e.target.closest('a')) {
             return;
@@ -107,6 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Keyboard Controls (Laptops/Clickers)
     // ==========================================
     document.addEventListener('keydown', (e) => {
+        if (e.target.closest('button, a, input, textarea, select, [contenteditable="true"]')) {
+            return;
+        }
+
         if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'PageDown') {
             e.preventDefault();
             changeSlide(currentIdx + 1);
